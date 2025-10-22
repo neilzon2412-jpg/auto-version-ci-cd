@@ -1,0 +1,52 @@
+name: auto-version
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+
+    if: github.actor != 'github-actions[bot]'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ler versão atual
+        id: ver
+        run: |
+          if [ ! -f version.txt ]; then
+            echo "v0.0.1" > version.txt
+          fi
+          v=$(tr -d '[:space:]' < version.txt)
+          echo "current=$v" >> $GITHUB_OUTPUT
+          echo "Versão atual: $v"
+
+      - name: Incrementar patch (x.y.Z -> x.y.Z+1)
+        run: |
+          v="${{ steps.ver.outputs.current }}"
+          v="${v#v}"
+          IFS='.' read -r MA MI PA <<< "$v"
+          PA=$((PA+1))
+          NEW="v${MA}.${MI}.${PA}"
+          echo "$NEW" > version.txt
+          echo "Nova versão: $NEW"
+
+      - name: Commit e push do version.txt
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add version.txt
+          if git diff --cached --quiet; then
+            echo "Sem mudanças para commitar"
+            exit 0
+          fi
+          git commit -m "Increment version [skip ci]"
+          git push
